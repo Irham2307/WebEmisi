@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Uji Emisi Kendaraan Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 1. Import Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+	<!-- Chart.js untuk grafik -->
+	<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+	<!-- SheetJS untuk ekspor Excel -->
+	<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="style.css" />
+
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+
+    <!-- Kontainer dan elemen HTML lainnya tetap sama -->
+    <div id="app-container" class="bg-white/80 backdrop-blur-xl p-6 sm:p-8 rounded-2xl shadow-2xl w-full max-w-lg transition-all duration-300 overflow-hidden">
+        <header class="flex items-center justify-between pb-4 border-b border-gray-200 mb-6">
+            <div class="flex items-center space-x-3">
+                <svg class="w-10 h-10 text-blue-600" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5.5 21L3 20V10.3C3 9.7 3.2 9.2 3.6 8.8L10.6 2.8C11.4 2.1 12.6 2.1 13.4 2.8L20.4 8.8C20.8 9.2 21 9.7 21 10.3V20L18.5 21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 15C15 16.7 13.7 18 12 18C10.3 18 9 16.7 9 15C9 13.3 10.3 12 12 12C13.7 12 15 13.3 15 15Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <h1 id="app-title" class="text-xl font-bold text-gray-800">Menu Utama</h1>
+            </div>
+            <button id="back-to-main-btn" class="hidden text-sm text-blue-600 font-semibold hover:underline">Kembali</button>
+        </header>
+        <main id="page-container">
+            <!-- Konten dimuat oleh JS -->
+        </main>
+        <footer class="text-center text-xs text-gray-400 pt-4 mt-6 border-t border-gray-200">
+            &copy; 2025 Dibuat oleh Irham Ramadhan. Seluruh hak cipta.
+        </footer>
+    </div>
+
+    <!-- Modal dan Template lainnya -->
+    <div id="custom-alert" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay"><div class="bg-white rounded-lg shadow-xl max-w-sm w-full p-6 text-center modal-box"><h3 class="text-lg font-bold text-gray-800 mb-2">Peringatan</h3><p id="alert-message" class="text-gray-600 mb-6"></p><button id="alert-close-btn" class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700">Tutup</button></div></div>
+    <template id="selection-template"><div id="selection-page" class="page-transition"><p class="text-center text-gray-600 mb-8 -mt-2">Selamat datang di portal uji emisi digital.</p><div class="space-y-4"><button id="goto-login-btn" class="w-full p-5 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-lg hover:border-blue-500 hover:-translate-y-1 transition-all duration-300 group flex items-center space-x-5"><div class="p-3 bg-blue-50 rounded-lg"><svg class="w-8 h-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></div><div class="text-left"><h2 class="text-lg font-bold text-gray-800">Input Data Emisi Baru</h2><p class="text-gray-600 text-sm">Lakukan pengukuran dan simpan data kendaraan.</p></div></button><button id="goto-history-btn" class="w-full p-5 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-lg hover:border-gray-500 hover:-translate-y-1 transition-all duration-300 group flex items-center space-x-5"><div class="p-3 bg-gray-50 rounded-lg"><svg class="w-8 h-8 text-gray-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></div><div class="text-left"><h2 class="text-lg font-bold text-gray-800">Cek Riwayat Emisi</h2><p class="text-gray-600 text-sm">Cari data uji emisi yang sudah tersimpan.</p></div></button></div></div></template>
+    <template id="login-template"><div class="page-transition space-y-4"><p class="text-center text-gray-600 -mt-2 mb-6">Masukkan kredensial Anda untuk melanjutkan.</p><form id="loginForm"><div class="space-y-4"><input type="text" id="username" placeholder="Username" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"><input type="password" id="password" placeholder="Password" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"></div><p id="login-error" class="text-red-500 text-sm text-center hidden h-5 mt-2">Username atau password salah!</p><button type="submit" class="w-full mt-4 bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 active:scale-95 transition flex items-center justify-center"><span class="btn-text">Login</span><span class="spinner hidden ml-2"></span></button></form></div></template>
+    <template id="emission-test-template">
+    <div class="page-transition">
+        <div class="mb-6 p-4 bg-gray-50 rounded-lg border">
+            <h2 class="font-semibold text-gray-700 text-center mb-3">Pembacaan Sensor Live</h2>
+            <div class="flex justify-around items-center">
+                <div class="text-center">
+                    <p class="text-sm text-gray-500">Gas CO</p>
+                    <p id="live-co-value" class="text-3xl font-bold text-blue-600">Menunggu...</p>
+                </div>
+                <div class="h-12 w-px bg-gray-200"></div>
+                <div class="text-center">
+                    <p class="text-sm text-gray-500">Gas HC</p>
+                    <p id="live-hc-value" class="text-3xl font-bold text-blue-600">Menunggu...</p>
+                </div>
+            </div>
+            <div class="flex items-center justify-center mt-2 text-xs text-gray-500">
+                <div id="live-dot-indicator" class="live-dot hidden"></div>
+                <span id="live-status-text">Menghubungkan ke ESP32...</span>
+            </div>
+        </div>
+
+        <form id="emissionForm" class="space-y-4">
+            <!-- 🆕 Plat kendaraan dipisah menjadi 3 kolom -->
+            <div>
+                <label class="block text-gray-700 font-medium mb-1">Masukkan Plat Kendaraan :</label>
+                <div class="flex space-x-2">
+                    <div class="w-1/4">
+                        <label for="plateCode" class="block text-gray-700 text-sm mb-1 text-center">Kode Wilayah :</label>
+                        <input type="text" id="plateCode" maxlength="2" placeholder="B"
+                            class="w-full px-4 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-center uppercase"
+                            pattern="[A-Za-z]+" title="Hanya huruf">
+                    </div>
+                    <div class="w-2/4">
+                        <label for="plateNumber" class="block text-gray-600 text-sm mb-1 text-center">Nomor Plat</label>
+                        <input type="text" id="plateNumber" maxlength="4" placeholder="1234"
+                            class="w-full px-4 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-center"
+                            pattern="[0-9]+" title="Hanya angka">
+                    </div>
+                    <div class="w-1/4">
+                        <label for="plateSuffix" class="block text-gray-600 text-sm mb-1 text-center">Huruf Belakang</label>
+                        <input type="text" id="plateSuffix" maxlength="3" placeholder="XYZ"
+                            class="w-full px-4 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-center uppercase"
+                            pattern="[A-Za-z]+" title="Hanya huruf">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 🆕 Label untuk Jenis Kendaraan -->
+            <div>
+                <label for="vehicleType" class="block text-gray-700 font-medium mb-0.5">Pilih Jenis Kendaraan :</label>
+                <select id="vehicleType"
+                    class="w-full px-4 py-1.5 bg-white border border-gray-300 rounded-lg appearance-none focus:ring-2 focus:ring-blue-500">
+                    <option value="penumpang">Kendaraan Roda 4 Orang</option>
+                    <option value="barang">Kendaraan Roda 4 Barang</option>
+                </select>
+            </div>
+
+            <!-- 🆕 Label untuk Tahun Pembuatan -->
+            <div>
+                <label for="productionYear" class="block text-gray-700 font-medium mb-0.5">Pilih Tahun Pembuatan :</label>
+                <select id="productionYear"
+                    class="w-full px-4 py-1.5 bg-white border border-gray-300 rounded-lg appearance-none focus:ring-2 focus:ring-blue-500">
+                    <option value="2007-2018">2007 - 2018</option>
+                    <option value="2018-atas">2018 ke atas</option>
+                </select>
+            </div>
+
+            <button type="button" id="saveBtn"
+                class="w-full bg-green-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-green-700 active:scale-95 transition">
+                Simpan Pengukuran
+            </button>
+        </form>
+    </div>
+</template>
+    <template id="saved-result-template"><div class="page-transition"><div class="text-center mb-6"><h1 class="text-2xl font-bold text-gray-800">Pengukuran Disimpan</h1><p class="text-gray-500 mt-1">Data berikut telah berhasil direkam.</p></div><div class="space-y-3 bg-gray-50 p-5 rounded-lg border text-sm"><div class="flex justify-between"><span class="text-gray-600">Plat Kendaraan:</span><strong id="res-plate" class="text-gray-800"></strong></div><div class="flex justify-between"><span class="text-gray-600">Jenis Kendaraan:</span><strong id="res-type" class="text-gray-800"></strong></div><div class="flex justify-between"><span class="text-gray-600">Tahun:</span><strong id="res-year" class="text-gray-800"></strong></div><hr class="my-2 !-mx-1 border-gray-200"><div class="flex justify-between items-center"><span class="text-gray-600">Hasil Gas CO:</span><div><strong id="res-co" class="text-gray-800 text-base"></strong><span id="co-threshold-info" class="text-xs text-gray-400 ml-2"></span></div></div><div class="flex justify-between items-center"><span class="text-gray-600">Hasil Gas HC:</span><div><strong id="res-hc" class="text-gray-800 text-base"></strong><span id="hc-threshold-info" class="text-xs text-gray-400 ml-2"></span></div></div></div><div id="res-status-box" class="p-4 rounded-lg text-center mt-4"><p class="font-bold text-xl" id="res-status-text"></p></div><div class="mt-6 space-y-2"><button type="button" id="test-again-btn" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 active:scale-95 transition">Lakukan Uji Lagi</button><button type="button" id="back-to-main-from-result-btn" class="w-full text-gray-600 font-semibold py-2 rounded-lg hover:bg-gray-100 transition">Kembali ke Menu Utama</button></div></div></template>
+<template id="history-check-template">
+  <div class="page-transition">
+    <!-- Label di atas kolom pencarian -->
+    <label for="searchPlate" class="block mb-2 text-gray-700 font-medium">
+      Masukkan Plat Kendaraan :
+    </label>
+    <div class="relative mb-4">
+      <input
+        type="text"
+        id="searchPlate"
+        placeholder="Contoh: B 123 AB"
+        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+      >
+      <button
+        id="search-btn"
+        class="absolute inset-y-0 right-0 px-4 text-gray-600 hover:text-blue-600"
+      >
+        <svg
+          class="w-5 h-5"
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke-width="2"
+          stroke="currentColor"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+          />
+        </svg>
+      </button>
+    </div>
+
+    <div id="history-results" class="mt-6 min-h-[100px]">
+      <div id="history-placeholder" class="text-center text-gray-500 pt-8">
+        <p>Hasil pencarian akan muncul di sini.</p>
+      </div>
+    </div>
+  </div>
+</template>
+    
+    <script>
+        // --- 1. KONFIGURASI FIREBASE ---
+        // GANTI DENGAN KONFIGURASI FIREBASE ANDA
+        const firebaseConfig = {
+            apiKey: "AIzaSyBm-SylGYn8RytwePT_BMCmsk6E0uPnjrk",
+            authDomain: "dataadc.firebaseapp.com",
+            databaseURL: "https://dataadc-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "dataadc",
+            storageBucket: "dataadc.firebasestorage.app",
+            messagingSenderId: "635900193793",
+            appId: "1:635900193793:web:43a10d86d141d0f7cae400",
+            measurementId: "G-2Q5R0999V3"
+        };
+
+        // --- 2. Inisialisasi Firebase ---
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- STATE & UI ELEMENTS ---
+            const pageContainer = document.getElementById('page-container');
+            const appTitle = document.getElementById('app-title');
+            const backToMainBtn = document.getElementById('back-to-main-btn');
+
+            // --- PAGE MANAGEMENT ---
+            const pageTemplates = {
+                'selection': document.getElementById('selection-template').content,
+                'login': document.getElementById('login-template').content,
+                'emission-test': document.getElementById('emission-test-template').content,
+                'saved-result': document.getElementById('saved-result-template').content,
+                'history-check': document.getElementById('history-check-template').content
+            };
+            
+            function showPage(pageName, data) {
+                // Hentikan listener Firebase jika ada
+                database.ref('/liveData').off();
+
+                const titles = {
+                    'selection': 'Menu Utama', 'login': 'Portal Petugas', 'emission-test': 'Uji Emisi Kendaraan',
+                    'saved-result': 'Hasil Pengukuran', 'history-check': 'Cek Riwayat'
+                };
+                appTitle.textContent = titles[pageName] || 'Menu Utama';
+                backToMainBtn.classList.toggle('hidden', pageName === 'selection');
+                
+                pageContainer.innerHTML = '';
+                const newPage = pageTemplates[pageName].cloneNode(true);
+                pageContainer.appendChild(newPage);
+
+                initPageScript(pageName, data);
+            }
+            
+            // --- SCRIPT INITIALIZATION ---
+            function initPageScript(pageName, data) {
+                switch(pageName) {
+                    case 'selection': initSelectionPage(); break;
+                    case 'login': initLoginPage(); break;
+                    case 'emission-test': initEmissionTestPage(); break;
+                    case 'saved-result': initSavedResultPage(data); break;
+                    case 'history-check': initHistoryCheckPage(); break;
+                }
+            }
+
+            // --- PAGE SCRIPTS ---
+            function initSelectionPage() {
+                document.getElementById('goto-login-btn').addEventListener('click', () => showPage('login'));
+                document.getElementById('goto-history-btn').addEventListener('click', () => showPage('history-check'));
+            }
+
+            function initLoginPage() {
+                const form = document.getElementById('loginForm');
+                form.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    if (form.querySelector('#username').value.trim() === 'admin' && form.querySelector('#password').value.trim() === 'admin') {
+                        showPage('emission-test');
+                    } else {
+                        form.querySelector('#login-error').classList.remove('hidden');
+                    }
+                });
+            }
+
+            function initEmissionTestPage() {
+                const liveCoValue = document.getElementById('live-co-value');
+                const liveHcValue = document.getElementById('live-hc-value');
+                const liveDot = document.getElementById('live-dot-indicator');
+                const liveStatusText = document.getElementById('live-status-text');
+
+                // Listener Firebase untuk data live
+const liveDataRef = database.ref('/sensor/data');
+liveDataRef.on('value', (snapshot) => {
+    const data = snapshot.val();
+    console.log("Data dari Firebase:", data); // DEBUG
+
+    if (data && typeof data === 'object') {
+        // Baca key persis seperti di ESP32
+        const co = parseFloat(data.CO_percent ?? 0);
+        const hc = parseFloat(data.HC_ppm ?? 0);
+
+        // Update tampilan
+        liveCoValue.textContent = `${co.toFixed(2)} %`;
+        liveHcValue.textContent = `${hc.toFixed(0)} ppm`;
+        liveDot.classList.remove('hidden');
+        liveStatusText.textContent = 'Menerima data dari ESP32...';
+    } else {
+        liveCoValue.textContent = '0.00 %';
+        liveHcValue.textContent = '0 ppm';
+        liveStatusText.textContent = 'Menunggu data...';
+        liveDot.classList.add('hidden');
+    }
+}, (errorObject) => {
+    console.error("Gagal membaca data live: " + errorObject.code);
+    liveStatusText.textContent = 'Koneksi Gagal';
+    liveDot.classList.add('hidden');
+});
+
+                
+                document.getElementById('saveBtn').addEventListener('click', function() {
+                    const plateCode = document.getElementById('plateCode').value.trim().toUpperCase();
+                    const plateNumber = document.getElementById('plateNumber').value.trim();
+                    const plateSuffix = document.getElementById('plateSuffix').value.trim().toUpperCase();
+
+                    // Validasi input
+                    if (!plateCode || !plateNumber) {
+                        showAlert('Mohon isi kolom plat kendaraan dengan benar!');
+                        return;
+                    }
+                    if (!/^[A-Z]+$/.test(plateCode)) {
+                        showAlert('Kode wilayah hanya boleh huruf!');
+                        return;
+                    }
+                    if (!/^[0-9]+$/.test(plateNumber)) {
+                        showAlert('Nomor kendaraan hanya boleh angka!');
+                        return;
+                    }
+                    if (plateSuffix && !/^[A-Z]+$/.test(plateSuffix)) {
+                        showAlert('Huruf belakang hanya boleh huruf!');
+                        return;
+                    }
+
+                    // Gabungkan plat
+                    const fullPlate = `${plateCode} ${plateNumber} ${plateSuffix}`.trim();
+
+                    const savedData = {
+                        plate: fullPlate,
+                        vehicleTypeValue: document.getElementById('vehicleType').value,
+                        vehicleTypeText: document.getElementById('vehicleType').options[document.getElementById('vehicleType').selectedIndex].text,
+                        yearValue: document.getElementById('productionYear').value,
+                        yearText: document.getElementById('productionYear').options[document.getElementById('productionYear').selectedIndex].text,
+                        coValue: document.getElementById('live-co-value').textContent,
+                        hcValue: document.getElementById('live-hc-value').textContent
+                    };
+                    classifyAndSave(savedData);
+                });
+            }
+
+            function initSavedResultPage(data) {
+                document.getElementById('res-plate').textContent = data.plate;
+                document.getElementById('res-type').textContent = data.vehicleTypeText;
+                document.getElementById('res-year').textContent = data.yearText;
+                document.getElementById('res-co').textContent = data.coValue;
+                document.getElementById('res-hc').textContent = data.hcValue;
+                
+                const { status, statusClass, coThreshold, hcThreshold } = getClassifcationResult(data);
+                
+                document.getElementById('res-status-text').textContent = status;
+                document.getElementById('res-status-box').className = `p-4 rounded-lg text-center mt-4 ${statusClass}`;
+                document.getElementById('co-threshold-info').textContent = `(Batas: ${coThreshold.toFixed(1)}%)`;
+                document.getElementById('hc-threshold-info').textContent = `(Batas: ${hcThreshold} ppm)`;
+
+                document.getElementById('test-again-btn').addEventListener('click', () => showPage('emission-test'));
+                document.getElementById('back-to-main-from-result-btn').addEventListener('click', () => showPage('selection'));
+            }
+
+            function initHistoryCheckPage() {
+				const searchBtn = document.getElementById('search-btn');
+				const searchInput = document.getElementById('searchPlate');
+				const resultsContainer = document.getElementById('history-results');
+
+				// 🔹 1. Tampilkan semua data otomatis saat halaman dibuka
+				const historyRef = database.ref('/history');
+				historyRef.on('value', (snapshot) => {
+				const allData = snapshot.val();
+				if (allData) {
+				let content = '';
+				Object.entries(allData).forEach(([plate, result]) => {
+                content += `
+                    <div class="bg-gray-50 p-4 rounded-lg border mb-3 page-transition">
+                        <div class="flex justify-between items-center mb-2">
+                            <h3 class="font-bold text-lg">${plate}</h3>
+                            <p class="text-sm text-gray-500">${result.date || '-'}</p>
+                        </div>
+                        <div class="text-sm space-y-1">
+                            <p><strong>CO:</strong> ${result.co}</p>
+                            <p><strong>HC:</strong> ${result.hc}</p>
+                            <p><strong>Status:</strong> ${result.status}</p>
+                        </div>
+                        <div class="mt-3 p-2 text-center font-semibold rounded ${result.statusClass || ''}">
+                            ${result.status || ''}
+                        </div>
+                    </div>`;
+            });
+            resultsContainer.innerHTML = content;
+        } else {
+            resultsContainer.innerHTML = `
+                <div class="text-center text-gray-500 pt-8 page-transition">
+                    <p>Belum ada data riwayat tersimpan.</p>
+                </div>`;
+        }
+    });
+
+    // 🔹 2. Fitur cari (masih bisa digunakan)
+    searchBtn.addEventListener('click', () => displayHistory(searchInput.value));
+    searchInput.addEventListener('keyup', e => e.key === 'Enter' && displayHistory(searchInput.value));
+}
+
+
+            function displayHistory(plateValue) {
+                const plate = plateValue.toUpperCase().trim();
+                if (!plate) return;
+
+                const historyRef = database.ref('/history/' + plate);
+                historyRef.once('value', (snapshot) => {
+                    const result = snapshot.val();
+                    const resultsContainer = document.getElementById('history-results');
+                    let content;
+                    if(result) {
+                        content = `<div class="bg-gray-50 p-4 rounded-lg border page-transition"><div class="flex justify-between items-center mb-2"><h3 class="font-bold text-lg">${plate}</h3><p class="text-sm text-gray-500">${result.date}</p></div><div class="text-sm space-y-1"><p><strong>CO:</strong> ${result.co}</p><p><strong>HC:</strong> ${result.hc}</p></div><div class="mt-3 p-2 text-center font-semibold rounded ${result.statusClass}">${result.status}</div></div>`;
+                    } else {
+                        content = `<div class="text-center text-gray-500 pt-8 page-transition"><p>Data untuk plat nomor "${plate}" tidak ditemukan.</p></div>`;
+                    }
+                    resultsContainer.innerHTML = content;
+                });
+            }
+
+            // --- LOGIC FUNCTIONS ---
+            function getClassifcationResult(data) {
+                const coNumeric = parseFloat(data.coValue);
+                const hcNumeric = parseInt(data.hcValue);
+                let coThreshold, hcThreshold;
+                if (data.vehicleTypeValue === 'penumpang' && data.yearValue === '2007-2018') { coThreshold = 1.0; hcThreshold = 150; } 
+                else if (data.vehicleTypeValue === 'penumpang' && data.yearValue === '2018-atas') { coThreshold = 0.5; hcThreshold = 100; }
+                else if (data.vehicleTypeValue === 'barang' && data.yearValue === '2007-2018') { coThreshold = 1.0; hcThreshold = 200; }
+                else if (data.vehicleTypeValue === 'barang' && data.yearValue === '2018-atas') { coThreshold = 0.5; hcThreshold = 150; }
+                if (coNumeric <= coThreshold && hcNumeric <= hcThreshold) { return { status: 'Lulus Uji Emisi', statusClass: 'bg-green-100 text-green-800', coThreshold, hcThreshold }; }
+                else { return { status: 'Tidak Lulus Uji Emisi', statusClass: 'bg-red-100 text-red-800', coThreshold, hcThreshold }; }
+            }
+
+            function classifyAndSave(data) {
+                const { status, statusClass } = getClassifcationResult(data);
+                const today = new Date();
+                const record = {
+                    date: `${today.getDate().toString().padStart(2, '0')}-${(today.getMonth() + 1).toString().padStart(2, '0')}-${today.getFullYear()}`,
+                    co: data.coValue, hc: data.hcValue,
+                    status, statusClass
+                };
+                
+                database.ref('/history/' + data.plate).set(record)
+                    .then(() => {
+                        showPage('saved-result', data);
+                    })
+                    .catch((error) => {
+                        console.error("Gagal menyimpan data: ", error);
+                        showAlert("Gagal menyimpan data ke database.");
+                    });
+            }
+            
+            // --- CUSTOM ALERT ---
+            const customAlert = document.getElementById('custom-alert');
+            const alertCloseBtn = document.getElementById('alert-close-btn');
+            function showAlert(message) {
+                document.getElementById('alert-message').textContent = message;
+                customAlert.classList.remove('hidden');
+            }
+            alertCloseBtn.addEventListener('click', () => customAlert.classList.add('hidden'));
+
+            // --- INITIAL NAVIGATION ---
+            backToMainBtn.addEventListener('click', () => showPage('selection'));
+            showPage('selection');
+        });
+    </script>
+</body>
+</html>
+
